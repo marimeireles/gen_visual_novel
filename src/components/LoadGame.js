@@ -16,8 +16,8 @@ const LoadGame = () => {
     const gamesData = keys
       .map(key => {
         const memory = getGameMemory(key);
-        if (memory && memory.setup) {
-          return { key, label: memory.setup.userName || key };
+        if (memory && memory.introduction) {
+          return { key, label: memory.introduction.storyName };
         }
         return null;
       })

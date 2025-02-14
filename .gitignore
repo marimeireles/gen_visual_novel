@@ -1,3 +1,4 @@
 node_modules/
 visual_novel/
 package-lock.json
+.env

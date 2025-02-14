@@ -4,11 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import OpenAI from 'openai';
 import { getCurrentStoryName, getGameMemory, saveGameMemory } from '../utils/gameMemoryManager';
 
-const apiKey = process.env.API_KEY;
+const apiKey = process.env.REACT_APP_API_KEY;
 
 const openai = new OpenAI({ 
   apiKey: apiKey, 
-  dangerouslyAllowBrowser: true 
+  dangerouslyAllowBrowser: true
 });
 
 const IntroductionStory = () => {
@@ -24,7 +24,6 @@ const IntroductionStory = () => {
   // On mount, load the temporary game memory (saved in new game setup) and kick off the LLM call.
   useEffect(() => {
     fetchStoryOptions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Build a prompt for the LLM using the setup information.
@@ -111,7 +110,7 @@ Generate a short, catchy story name. The name should be in plain ASCII character
     try {
       const prompt = buildNamePrompt(selectedOption);
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [{ role: 'user', content: prompt }],
       });
       let generatedName = completion.choices[0].message.content.trim();
@@ -130,10 +129,12 @@ Generate a short, catchy story name. The name should be in plain ASCII character
 
   // Process the generated story name: remove non-ASCII, replace spaces, and limit length.
   const processStoryName = (name) => {
-    name = name.replace(/[^\x00-\x7F]/g, "");
-    name = name.replace(/\s+/g, "_");
-    if (name.length > 30) {
-      name = name.substring(0, 30);
+    if (name.length > 40) {
+      name = name.substring(0, 40); // Trim to 30 characters first
+      let lastSpace = name.lastIndexOf(' '); // Find the last space within the trimmed string
+      if (lastSpace !== -1) {
+        name = name.substring(0, lastSpace); // Trim at the last space
+      }
     }
     return name;
   };

@@ -6,7 +6,7 @@ import OpenAI from 'openai';
 import { getCurrentStoryName, getCurrentUserName } from '../utils/gameMemoryManager';
 import { useNavigate } from 'react-router-dom';
 
-const apiKey = process.env.API_KEY;
+const apiKey = process.env.REACT_APP_API_KEY;
 
 const openai = new OpenAI({ 
   apiKey: apiKey, 
