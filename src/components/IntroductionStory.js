@@ -4,7 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import OpenAI from 'openai';
 import { getCurrentStoryName, getGameMemory, saveGameMemory } from '../utils/gameMemoryManager';
 
+const apiKey = process.env.API_KEY;
+
 const openai = new OpenAI({ 
+  apiKey: apiKey, 
   dangerouslyAllowBrowser: true 
 });
 
