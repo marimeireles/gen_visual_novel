@@ -1,4 +1,3 @@
-// src/components/NewGameSetup.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Import the memory manager functions instead of directly using localStorage.
@@ -77,7 +76,7 @@ const NewGameSetup = () => {
       <h2>New Game Setup</h2>
       <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.formGroup}>
-          <label>Name (max 20 chars):</label>
+          <label>Name:</label>
           <input
             type="text"
             value={userName}

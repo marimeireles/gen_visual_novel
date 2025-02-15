@@ -21,17 +21,16 @@ const MainMenu = () => {
     }
   };
 
-  const handleQuit = () => {
-    alert('Thanks for playing!');
-    // Optionally, you might try to close the window here (if allowed).
+  const handleAbout = () => {
+    console.log('Displays about page')
   };
 
   return (
     <div className="main-menu" style={styles.menuContainer}>
-      <h1>Visual Novel Game</h1>
+      <h1>Visual Novel</h1>
       <button style={styles.button} onClick={handleStartNewGame}>Start New Game</button>
       <button style={styles.button} onClick={handleLoad}>Load</button>
-      <button style={styles.button} onClick={handleQuit}>Quit Game</button>
+      <button style={styles.button} onClick={handleAbout}>About</button>
     </div>
   );
 };
