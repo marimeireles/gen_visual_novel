@@ -1,24 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// Import the memory manager functions instead of directly using localStorage.
+import styled, { keyframes } from 'styled-components';
 import { setCurrentStoryName, saveGameMemory } from '../utils/gameMemoryManager';
 
 const NewGameSetup = () => {
   const navigate = useNavigate();
 
-  // Form state for basic info.
   const [userName, setUserName] = useState('');
   const [age, setAge] = useState('');
-
-  // Arrays for up to 3 favorite things and personality traits.
   const [favorites, setFavorites] = useState(['', '', '']);
   const [personalities, setPersonalities] = useState(['', '', '']);
+  const [setting, setSetting] = useState('');
+  const [gameType, setGameType] = useState('');
 
-  // State for genre settings.
-  const [setting, setSetting] = useState('');   // Options: sci-fi, fantasy, contemporary.
-  const [gameType, setGameType] = useState('');   // Options: adventure, romance, mystery.
-
-  // Handlers for favorite things and personality traits.
   const handleFavoriteChange = (index, value) => {
     const newFavorites = [...favorites];
     newFavorites[index] = value.slice(0, 20);
@@ -31,193 +25,173 @@ const NewGameSetup = () => {
     setPersonalities(newPersonalities);
   };
 
-  // When the form is submitted, validate and save the data.
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Validate required fields.
     if (!userName || !age || !setting || !gameType) {
       alert("Please fill out all required fields.");
       return;
     }
 
-    // Create a descriptive setup object.
     const setupData = {
       timestamp: new Date().toLocaleString(),
       userName: userName.slice(0, 20),
       userAge: parseInt(age, 10),
       favoriteThings: favorites.filter(fav => fav.trim() !== ''),
       personalityTraits: personalities.filter(trait => trait.trim() !== ''),
-      genreSetting: {
-        setting,  // 'sci-fi', 'fantasy', or 'contemporary'
-        gameType, // 'adventure', 'romance', or 'mystery'
-      }
+      genreSetting: { setting, gameType }
     };
 
-    // Prepare an object that will hold the initial game data.
-    const chatMemory = {
-      setup: setupData,
-      chatHistory: []
-    };
-
-    // Generate a unique currentStoryName using the userName and a timestamp.
+    const chatMemory = { setup: setupData, chatHistory: [] };
     const currentStoryName = `story-${userName}-${Date.now()}`;
     
-    // Use the memory manager functions to save the game data in the expected format.
     setCurrentStoryName(currentStoryName);
     saveGameMemory(currentStoryName, chatMemory);
-
-    // Navigate to the introduction interface.
     navigate('/introduction');
   };
 
   return (
-    <div style={styles.container}>
-      <h2>New Game Setup</h2>
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <div style={styles.formGroup}>
-          <label>Name:</label>
-          <input
-            type="text"
-            value={userName}
-            maxLength="20"
-            onChange={(e) => setUserName(e.target.value)}
-            required
-          />
-        </div>
+    <Container>
+      <Title>New Game Setup</Title>
+      <Form onSubmit={handleSubmit}>
+        <FormGroup>
+          <Label>Name:</Label>
+          <Input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} maxLength="20" required />
+        </FormGroup>
 
-        <div style={styles.formGroup}>
-          <label>Age:</label>
-          <input
-            type="number"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            required
-          />
-        </div>
+        <FormGroup>
+          <Label>Age:</Label>
+          <Input type="number" value={age} onChange={(e) => setAge(e.target.value)} required />
+        </FormGroup>
 
-        <div style={styles.formGroup}>
-          <label>Favorite Things (up to 3, each max 20 chars):</label>
+        <FormGroup>
+          <Label>Favorite Things (up to 3):</Label>
           {favorites.map((fav, index) => (
-            <input
+            <Input
               key={index}
               type="text"
               value={fav}
-              maxLength="20"
               onChange={(e) => handleFavoriteChange(index, e.target.value)}
               placeholder={`Favorite ${index + 1}`}
+              maxLength="20"
             />
           ))}
-        </div>
+        </FormGroup>
 
-        <div style={styles.formGroup}>
-          <label>Personality Traits (up to 3, each max 20 chars):</label>
+        <FormGroup>
+          <Label>Personality Traits (up to 3):</Label>
           {personalities.map((trait, index) => (
-            <input
+            <Input
               key={index}
               type="text"
               value={trait}
-              maxLength="20"
               onChange={(e) => handlePersonalityChange(index, e.target.value)}
               placeholder={`Trait ${index + 1}`}
+              maxLength="20"
             />
           ))}
-        </div>
+        </FormGroup>
 
-        {/* Genre Setting Buttons */}
-        <div style={styles.buttonGroup}>
+        <ButtonGroup>
           <p>Select your game's setting:</p>
-          <button
-            type="button"
-            onClick={() => setSetting('sci-fi')}
-            style={setting === 'sci-fi' ? styles.selectedButton : styles.button}
-          >
-            Sci-Fi
-          </button>
-          <button
-            type="button"
-            onClick={() => setSetting('fantasy')}
-            style={setting === 'fantasy' ? styles.selectedButton : styles.button}
-          >
-            Fantasy
-          </button>
-          <button
-            type="button"
-            onClick={() => setSetting('contemporary')}
-            style={setting === 'contemporary' ? styles.selectedButton : styles.button}
-          >
-            Contemporary
-          </button>
-        </div>
+          <MetalButton onClick={() => setSetting('sci-fi')} active={setting === 'sci-fi'}>Sci-Fi</MetalButton>
+          <MetalButton onClick={() => setSetting('fantasy')} active={setting === 'fantasy'}>Fantasy</MetalButton>
+          <MetalButton onClick={() => setSetting('contemporary')} active={setting === 'contemporary'}>Contemporary</MetalButton>
+        </ButtonGroup>
 
-        {/* Game Type Buttons */}
-        <div style={styles.buttonGroup}>
+        <ButtonGroup>
           <p>Select your game type:</p>
-          <button
-            type="button"
-            onClick={() => setGameType('adventure')}
-            style={gameType === 'adventure' ? styles.selectedButton : styles.button}
-          >
-            Adventure
-          </button>
-          <button
-            type="button"
-            onClick={() => setGameType('romance')}
-            style={gameType === 'romance' ? styles.selectedButton : styles.button}
-          >
-            Romance
-          </button>
-          <button
-            type="button"
-            onClick={() => setGameType('mystery')}
-            style={gameType === 'mystery' ? styles.selectedButton : styles.button}
-          >
-            Mystery
-          </button>
-        </div>
+          <MetalButton onClick={() => setGameType('adventure')} active={gameType === 'adventure'}>Adventure</MetalButton>
+          <MetalButton onClick={() => setGameType('romance')} active={gameType === 'romance'}>Romance</MetalButton>
+          <MetalButton onClick={() => setGameType('mystery')} active={gameType === 'mystery'}>Mystery</MetalButton>
+        </ButtonGroup>
 
-        <button type="submit" style={styles.submitButton}>
-          Start Game
-        </button>
-      </form>
-    </div>
+        <SubmitButton type="submit">Start Game</SubmitButton>
+      </Form>
+    </Container>
   );
 };
 
-const styles = {
-  container: {
-    textAlign: 'center',
-    paddingTop: '50px'
-  },
-  form: {
-    display: 'inline-block',
-    textAlign: 'left',
-    maxWidth: '400px'
-  },
-  formGroup: {
-    marginBottom: '15px'
-  },
-  buttonGroup: {
-    marginBottom: '15px'
-  },
-  button: {
-    marginRight: '10px',
-    padding: '8px 12px',
-    cursor: 'pointer'
-  },
-  selectedButton: {
-    marginRight: '10px',
-    padding: '8px 12px',
-    cursor: 'pointer',
-    backgroundColor: '#007bff',
-    color: '#fff'
-  },
-  submitButton: {
-    width: '100%',
-    padding: '10px',
-    fontSize: '16px',
-    cursor: 'pointer'
-  }
-};
-
 export default NewGameSetup;
+
+const body = styled.body`
+  font-family: 'Cinzel', serif;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #fff;
+`;
+
+// Styled Components
+const Container = styled.div`
+  text-align: center;
+  padding: 50px 20px;
+  background: #000;
+  min-height: 100vh;
+  color: #fff;
+`;
+
+const Title = styled.h2`
+  font-family: 'Cinzel', serif;
+  font-size: 36px;
+  margin-bottom: 30px;
+`;
+
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 600px;
+  margin: 0 auto;
+`;
+
+const FormGroup = styled.div`
+  margin-bottom: 20px;
+  width: 100%;
+`;
+
+const Label = styled.label`
+  font-size: 18px;
+  margin-bottom: 5px;
+  display: block;
+`;
+
+const Input = styled.input`
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #555;
+  border-radius: 5px;
+  background: #1a1a1a;
+  color: #fff;
+`;
+
+const ButtonGroup = styled.div`
+  margin-bottom: 20px;
+`;
+
+const MetalButton = styled.button`
+  padding: 12px 20px;
+  font-size: 16px;
+  margin-right: 10px;
+  color: #fff;
+  background: ${(props) => (props.active ? '#333' : 'linear-gradient(145deg, #1a1a1a, #0d0d0d)')};
+  border: 2px solid ${(props) => (props.active ? '#007bff' : '#333')};
+  border-radius: 15px;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.8), inset 0 -3px 10px rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: linear-gradient(145deg, #333, #1a1a1a);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.6), 0 8px 15px rgba(0, 0, 0, 1);
+  }
+`;
+
+const SubmitButton = styled(MetalButton)`
+  width: 100%;
+  margin-top: 20px;
+  clip-path: none;
+  border-radius: 10px;
+`;
+
