@@ -1,13 +1,44 @@
 // src/components/MainMenu.js
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
+
+// A helper component for a single random cloud that repositions and gets a new duration on each animation cycle.
+const RandomCloud = () => {
+  // Generate random position and size.
+  const getRandomPosition = () => ({
+    top: Math.random() * 100 + '%',
+    left: Math.random() * 100 + '%',
+    size: (Math.random() * 200 + 300) + 'px', // Size between 300px and 500px
+  });
+
+  // Generate a random duration between 5s and 15s.
+  const getRandomDuration = () => (Math.random() * 10 + 20) + 's';
+
+  const [position, setPosition] = useState(getRandomPosition());
+  const [duration, setDuration] = useState(getRandomDuration());
+
+  // When the animation iteration completes, update position and duration.
+  const handleAnimationIteration = () => {
+    setPosition(getRandomPosition());
+    setDuration(getRandomDuration());
+  };
+
+  return (
+    <Cloud
+      top={position.top}
+      left={position.left}
+      size={position.size}
+      duration={duration}
+      onAnimationIteration={handleAnimationIteration}
+    />
+  );
+};
 
 const MainMenu = () => {
   const navigate = useNavigate();
 
   const handleStartNewGame = () => {
-    console.log('Starting a new game...'); // This logs for debugging
     navigate('/new-game');
   };
 
@@ -24,9 +55,13 @@ const MainMenu = () => {
     console.log('Displays about page');
   };
 
+  const cloudCount = 8;
+  const clouds = Array.from({ length: cloudCount }, (_, i) => <RandomCloud key={i} />);
+
   return (
     <MenuContainer>
-      <Logo src={require('../assets/continuum.png')} alt="Continuum" />
+      {clouds}
+      <GlowingLogo src={require('../assets/continuum.png')} alt="Continuum Logo" />
       <ButtonContainer>
         <MetalButton onClick={handleStartNewGame}>Start New Game</MetalButton>
         <MetalButton onClick={handleLoad}>Load</MetalButton>
@@ -47,26 +82,61 @@ const MenuContainer = styled.div`
   align-items: center;
   background: #000;
   min-height: 100vh;
+  position: relative;
+  overflow: hidden;
 `;
 
-const Logo = styled.img`
+// Animation for the subtle breathing effect.
+const breathingCloudAnimation = keyframes`
+  0% {
+    opacity: 0.0;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.5);
+  }
+  100% {
+    opacity: 0.0;
+    transform: scale(1);
+  }
+`;
+
+// Cloud styled-component using dynamic props for position, size, and duration.
+const Cloud = styled.div`
+  position: absolute;
+  top: ${props => props.top};
+  left: ${props => props.left};
+  width: ${props => props.size};
+  height: ${props => props.size};
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, rgba(247, 37, 133, 0) 70%);
+  border-radius: 50%;
+  animation: ${breathingCloudAnimation} ${props => props.duration} infinite;
+  z-index: 0;
+`;
+
+const GlowingLogo = styled.img`
   width: 500px;
   height: auto;
+  position: relative;
+  z-index: 1;
+  display: block;
   margin-bottom: 30px;
+  filter: drop-shadow(0 0 0.75rem rgb(122, 122, 122));
 `;
 
 const ButtonContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
+  z-index: 1;
 `;
 
 const shimmer = keyframes`
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 `;
-
-
 
 const MetalButton = styled.button`
   margin: 15px;

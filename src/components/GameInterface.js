@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import OpenAI from 'openai';
 import { getCurrentStoryName, getCurrentUserName } from '../utils/gameMemoryManager';
 import { useNavigate } from 'react-router-dom';
+import boxImage from '../assets/box.png';
+import textboxImage from '../assets/box.png';
+// import characterImage from '../assets/default-character.png';
 
 const apiKey = process.env.REACT_APP_API_KEY;
 
@@ -16,23 +19,19 @@ const openai = new OpenAI({
  * Each record contains a timestamp, Assistence's text, the user's name, and the option chosen.
  */
 function saveMemoryRecord(assistentText, userChoice, userName) {
-  // Retrieve the current story name.
   const currentStoryName = localStorage.getItem('currentStoryName');
   if (!currentStoryName) {
     console.error("No current story found. Please start a new game first.");
     return;
   }
 
-  // Retrieve the existing memory for the current story.
   const memory = JSON.parse(localStorage.getItem(currentStoryName));
   if (!memory) {
     console.error("No memory data found for the current story.");
     return;
   }
   
-  // Create a timestamp.
   const timestamp = new Date().toLocaleString();
-  // Build the new record.
   const record = {
     timestamp,
     assistentText,
@@ -40,19 +39,17 @@ function saveMemoryRecord(assistentText, userChoice, userName) {
     userName,
   };
 
-  // Append the record to the chatHistory.
   if (!Array.isArray(memory.chatHistory)) {
     memory.chatHistory = [];
   }
   memory.chatHistory.push(record);
 
-  // Save the updated memory back under the current story key.
   localStorage.setItem(currentStoryName, JSON.stringify(memory));
 }
 
 /**
  * Parse the API response text into Assistence's text and the three options.
- * The expected format is:
+ * Expected format:
  *   Assistence: <Assistence's text>
  *   option 1: <option 1 text>
  *   option 2: <option 2 text>
@@ -65,8 +62,8 @@ const parseApiResponse = (responseText) => {
   let option2 = "";
   let option3 = "";
   lines.forEach((line) => {
-    if (line.toLowerCase().startsWith("Assistence:")) {
-      assistentText = line.substring("Assistence:".length).trim();
+    if (line.toLowerCase().startsWith("assistence:")) {
+      assistentText = line.substring("assistence:".length).trim();
     } else if (line.toLowerCase().startsWith("option 1:")) {
       option1 = line.substring("option 1:".length).trim();
     } else if (line.toLowerCase().startsWith("option 2:")) {
@@ -80,19 +77,20 @@ const parseApiResponse = (responseText) => {
 
 const GameInterface = () => {
   const [currentStoryName, setCurrentStoryNameState] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const key = getCurrentStoryName();
     if (!key) {
-      console.log('Key for game access doesnt exist. You might have erased your cache or this is a bigger problem sorry!')
+      console.log('Key for game access does not exist. You might have erased your cache or this is a bigger problem, sorry!');
+      // Optionally redirect or handle this case.
     }
-    console.log('this is the current key of this GameInterface', key)
+    console.log('Current key of GameInterface:', key);
     setCurrentStoryNameState(key);
   }, []);
 
-  const userName = getCurrentUserName();;
+  const userName = getCurrentUserName();
 
-  // State to manage conversation history, text pagination, options, and the last response from Assistence.
   const [conversationHistory, setConversationHistory] = useState([{
     role: 'user',
     content: `you're a kawaii anime cat girl called "Assistence" talking to a nerd playing a visual novel
@@ -102,15 +100,13 @@ option 1: <option 1 text>
 option 2: <option 2 text>
 option 3: <option 3 text>`
   }]);
-  const [characterPages, setCharacterPages] = useState([]); // Paginated text of Assistence's response
+  const [characterPages, setCharacterPages] = useState([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [options, setOptions] = useState([]); // Option strings for the user to choose from
+  const [options, setOptions] = useState([]);
   const [showOptions, setShowOptions] = useState(false);
   const [loading, setLoading] = useState(false);
-  // Store the full Assistence text from the most recent API response (before pagination)
   const [lastassistentText, setLastassistentText] = useState("");
 
-  // Helper function to split text into pages (200 characters each)
   const paginateText = (text, pageSize = 200) => {
     const pages = [];
     for (let i = 0; i < text.length; i += pageSize) {
@@ -119,10 +115,8 @@ option 3: <option 3 text>`
     return pages;
   };
 
-  // Function to call the OpenAI API and update state with the response.
   const fetchGameData = async (newMessage = null) => {
     setLoading(true);
-    // Build the messages array for the API call.
     const messages = newMessage
       ? [...conversationHistory, { role: 'user', content: newMessage }]
       : conversationHistory;
@@ -133,23 +127,16 @@ option 3: <option 3 text>`
         store: true,
         messages: messages,
       });
-      // Extract the assistant's response.
       const responseContent = completion.choices[0].message.content;
       const parsed = parseApiResponse(responseContent);
 
-      // Save the full Assistence text in state (to use when the user picks an option)
       setLastassistentText(parsed.assistentText);
-
-      // Update conversation history with the API response.
       const responseMessage = { role: 'assistant', content: responseContent };
       setConversationHistory([...messages, responseMessage]);
 
-      // Paginate Assistence's text for display purposes.
       const pages = paginateText(parsed.assistentText, 200);
       setCharacterPages(pages);
       setCurrentPageIndex(0);
-
-      // Set the options for the user to choose from.
       setOptions([parsed.option1, parsed.option2, parsed.option3]);
       setShowOptions(false);
     } catch (error) {
@@ -158,35 +145,21 @@ option 3: <option 3 text>`
     setLoading(false);
   };
 
-  // Initial API call when the component mounts.
   useEffect(() => {
     fetchGameData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handler for displaying the next chunk of Assistence's text.
   const handleNextText = () => {
     if (currentPageIndex < characterPages.length - 1) {
       setCurrentPageIndex(currentPageIndex + 1);
     } else {
-      // Once all pages are shown, reveal the options.
       setShowOptions(true);
     }
   };
 
-  /**
-   * When the user selects an option, we first save the memory record.
-   * The memory record includes:
-   *  - The current timestamp
-   *  - Assistence's full text (from the last API response)
-   *  - The user's selected option
-   *  - The user's name
-   * Then, we send the chosen option back to the API.
-   */
   const handleOptionClick = (optionText) => {
-    // Save the memory record.
     saveMemoryRecord(lastassistentText, optionText, userName);
-    // Then, send the user's option to fetch the next game state.
     fetchGameData(optionText);
   };
 
@@ -195,15 +168,14 @@ option 3: <option 3 text>`
       <div
         className="background"
         style={{
-          backgroundImage: `url(${"default-background.jpg"})`, // Replace with your dynamic background if needed.
+          backgroundImage: `url(${boxImage})`,
           height: '100vh',
           backgroundSize: 'cover',
           position: 'relative',
         }}
       >
-        {/* Character overlay image (if needed) */}
-        <img
-          src={"default-character.png"} // Replace with your dynamic character image if needed.
+        {/* <img
+          src={characterImage}
           alt="Character"
           style={{
             position: 'absolute',
@@ -212,20 +184,22 @@ option 3: <option 3 text>`
             transform: 'translateX(-50%)',
             maxHeight: '80vh',
           }}
-        />
+        /> */}
 
-        {/* Text box overlay */}
+        {/* New image-based text box overlay */}
         <div
           className="text-box"
           style={{
             position: 'absolute',
-            bottom: '10%',
-            left: '10%',
-            right: '10%',
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            color: '#fff',
+            bottom: '50px',
+            left: '50px',
+            right: '50px',
+            height: '200px',
+            backgroundImage: `url(${textboxImage})`,
+            backgroundPosition: 'center',
             padding: '20px',
             borderRadius: '8px',
+            color: '#fff',
             fontSize: '18px',
           }}
         >
@@ -237,7 +211,6 @@ option 3: <option 3 text>`
               <button onClick={handleNextText}>Next</button>
             </>
           ) : (
-            // Render option buttons when all of Assistence's text has been shown.
             <div className="options">
               {options.map((option, index) => (
                 <button key={index} onClick={() => handleOptionClick(option)}>

@@ -51,60 +51,80 @@ const NewGameSetup = () => {
   return (
     <Container>
       <Title>New Game Setup</Title>
-      <Form onSubmit={handleSubmit}>
-        <FormGroup>
-          <Label>Name:</Label>
-          <StyledInput type="text" value={userName} onChange={(e) => setUserName(e.target.value)} maxLength="20" required />
-        </FormGroup>
+      {/* Prevent form submission on Enter by preventing default on submit */}
+      <Form onSubmit={(e) => e.preventDefault()}>
+        <FormGroupRow>
+          <FormGroupColumn flex={4}>
+            <Label>Name:</Label>
+            <StyledInput
+              type="text"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              maxLength="20"
+              required
+            />
+          </FormGroupColumn>
+          <FormGroupColumn flex={1}>
+            <Label>Age:</Label>
+            <AgeInput
+              type="number"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              required
+            />
+          </FormGroupColumn>
+        </FormGroupRow>
 
         <FormGroup>
-          <Label>Age:</Label>
-          <StyledInput type="number" value={age} onChange={(e) => setAge(e.target.value)} required />
-        </FormGroup>
-
-        <FormGroup>
-          <Label>Favorite Things (up to 3):</Label>
+          <Label>Objects of desire:</Label>
           {favorites.map((fav, index) => (
             <StyledInput
               key={index}
               type="text"
               value={fav}
               onChange={(e) => handleFavoriteChange(index, e.target.value)}
-              placeholder={`Favorite ${index + 1}`}
-              maxLength="20"
+              maxLength="40"
             />
           ))}
         </FormGroup>
 
         <FormGroup>
-          <Label>Personality Traits (up to 3):</Label>
+          <Label>Personality traits:</Label>
           {personalities.map((trait, index) => (
             <StyledInput
               key={index}
               type="text"
               value={trait}
               onChange={(e) => handlePersonalityChange(index, e.target.value)}
-              placeholder={`Trait ${index + 1}`}
-              maxLength="20"
+              maxLength="40"
             />
           ))}
         </FormGroup>
 
         <ButtonGroup>
-          <SectionTitle>Select your game's setting:</SectionTitle>
-          <NeonButton onClick={() => setSetting('sci-fi')} active={setting === 'sci-fi'}>Sci-Fi</NeonButton>
-          <NeonButton onClick={() => setSetting('fantasy')} active={setting === 'fantasy'}>Fantasy</NeonButton>
-          <NeonButton onClick={() => setSetting('contemporary')} active={setting === 'contemporary'}>Contemporary</NeonButton>
+          <SectionTitle>Select your game's universe:</SectionTitle>
+          <NeonButton onClick={() => setSetting('little-martian')} active={setting === 'little-martian'}>
+            Little Martian
+          </NeonButton>
+          <NeonButton onClick={() => setSetting('self-made')} active={setting === 'self-made'}>
+            Build your own
+          </NeonButton>
         </ButtonGroup>
 
         <ButtonGroup>
-          <SectionTitle>Select your game type:</SectionTitle>
-          <NeonButton onClick={() => setGameType('adventure')} active={gameType === 'adventure'}>Adventure</NeonButton>
-          <NeonButton onClick={() => setGameType('romance')} active={gameType === 'romance'}>Romance</NeonButton>
-          <NeonButton onClick={() => setGameType('mystery')} active={gameType === 'mystery'}>Mystery</NeonButton>
+          <SectionTitle>Select your game genre:</SectionTitle>
+          <NeonButton onClick={() => setGameType('murder-mistery')} active={gameType === 'murder-mistery'}>
+            Murder mistery
+          </NeonButton>
+          <NeonButton onClick={() => setGameType('open-ended')} active={gameType === 'open-ended'}>
+            Open ended learning
+          </NeonButton>
         </ButtonGroup>
 
-        <SubmitButton type="submit">Start Game</SubmitButton>
+        {/* Change type to "button" and attach handleSubmit to onClick */}
+        <SubmitButton type="button" onClick={handleSubmit}>
+          Start Game
+        </SubmitButton>
       </Form>
     </Container>
   );
@@ -124,7 +144,7 @@ const Container = styled.div`
 const Title = styled.h2`
   font-family: 'Cinzel', serif;
   font-size: 48px;
-  color:rgb(173, 173, 173);
+  color: rgb(173, 173, 173);
   margin-bottom: 30px;
   text-shadow: 0 0 20px grey, 0 0 40px grey;
 `;
@@ -137,6 +157,17 @@ const Form = styled.form`
   margin: 0 auto;
 `;
 
+const FormGroupRow = styled.div`
+  display: flex;
+  width: 100%;
+  gap: 20px;
+  margin-bottom: 20px;
+`;
+
+const FormGroupColumn = styled.div`
+  flex: ${(props) => props.flex};
+`;
+
 const FormGroup = styled.div`
   margin-bottom: 20px;
   width: 100%;
@@ -146,7 +177,7 @@ const Label = styled.label`
   font-size: 20px;
   margin-bottom: 8px;
   display: block;
-  color:rgb(173, 173, 173);;
+  color: rgb(173, 173, 173);
 `;
 
 const StyledInput = styled.input`
@@ -155,6 +186,7 @@ const StyledInput = styled.input`
   font-size: 16px;
   border: none;
   border-radius: 5px;
+  margin-top: 5px;
   background: rgba(50, 50, 50, 0.8);
   color: #fff;
   transition: all 0.3s ease;
@@ -164,6 +196,19 @@ const StyledInput = styled.input`
     outline: none;
     box-shadow: 0 0 10px grey;
   }
+`;
+
+const AgeInput = styled(StyledInput)`
+  max-width: 70px;
+  /* Remove spinner arrows in WebKit browsers */
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  margin-left: 49px;
+  /* Remove spinner arrows in Firefox */
+  -moz-appearance: textfield;
 `;
 
 const ButtonGroup = styled.div`
@@ -186,17 +231,17 @@ const NeonButton = styled.button`
   padding: 12px 20px;
   font-size: 16px;
   margin-right: 10px;
-  color: #fff;
-  background: ${(props) => (props.active ? '#f72585' : '#222')};
-  border: 2px solidrgb(127, 127, 127);
+  background: ${(props) => (props.active ? '#fff' : '#222')};
+  color: ${(props) => (props.active ? '#000' : '#fff')};
+  border: 2px solid rgb(127, 127, 127);
   border-radius: 15px;
   cursor: pointer;
   transition: all 0.3s ease;
   animation: ${(props) => (props.active ? neonGlow : 'none')} 2s infinite;
 
   &:hover {
-    background: solidrgb(127, 127, 127);
-    color: #fff;
+    background: solid rgb(127, 127, 127);
+    color: rgb(127, 127, 127);
     transform: scale(1.05);
   }
 `;
@@ -205,4 +250,3 @@ const SubmitButton = styled(NeonButton)`
   width: 100%;
   margin-top: 20px;
 `;
-
