@@ -6,6 +6,7 @@ import NewGameSetup from './components/NewGameSetup';
 import IntroductionStory from './components/IntroductionStory';
 import GameInterface from './components/GameInterface';
 import LoadGame from './components/LoadGame';
+import LittleMartianGame from './components/LittleMartianGame';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/introduction" element={<IntroductionStory />} />
         <Route path="/load-game" element={<LoadGame />} />
         <Route path="/game" element={<GameInterface />} />
+        <Route path="/litle-martian" element={<LittleMartianGame />} />
       </Routes>
     </Router>
   );
