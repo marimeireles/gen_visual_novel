@@ -21,14 +21,26 @@ export const setCurrentStoryName = (key) => {
   localStorage.setItem('currentStoryName', key);
 };
 
-export const getCurrentStoryName = () => {
+export const getCurrentStoryNameID = () => {
   return localStorage.getItem('currentStoryName');
 };
 
 export const getCurrentUserName = () => {
-    const currentStoryName = getCurrentStoryName();
+    const currentStoryName = getCurrentStoryNameID();
     if (!currentStoryName) return null;
     const memory = getGameMemory(currentStoryName);
     return memory && memory.setup ? memory.setup.userName : null;
-  };
-  
+};
+
+export const getCurrentStory = () => {
+    const currentStoryKey = getCurrentStoryNameID();
+    if (!currentStoryKey) return null;
+    return getGameMemory(currentStoryKey);
+};
+
+export const getCurrentSetting = () => {
+  const currentStoryKey = getCurrentStoryNameID();
+  if (!currentStoryKey) return null;
+  const memory = getGameMemory(currentStoryKey);
+  return memory?.setup?.genreSetting?.setting || null;
+};
