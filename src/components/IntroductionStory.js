@@ -3,12 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import OpenAI from 'openai';
-import { getCurrentStoryName, getGameMemory, saveGameMemory } from '../utils/gameMemoryManager';
+import { getCurrentStoryNameID, getCurrentSetting, getGameMemory, saveGameMemory } from '../utils/gameMemoryManager';
 
 const apiKey = process.env.REACT_APP_API_KEY;
 
 const openai = new OpenAI({ 
-  apiKey: apiKey, 
+  apiKey: apiKey,
   dangerouslyAllowBrowser: true
 });
 
@@ -48,7 +48,7 @@ Option 3: <story beginning option 3>
   const fetchStoryOptions = async () => {
     setLoading(true);
     try {
-      const storyKey = getCurrentStoryName();
+      const storyKey = getCurrentStoryNameID();
       if (!storyKey) {
         navigate('/new-game');
         return;
@@ -120,7 +120,12 @@ Generate a short, catchy story name. The name should be in plain ASCII character
       updateMemoryWithStory(generatedName, selectedOption);
       setPhase('done');
       // Redirect to game interface shortly after.
-      setTimeout(() => navigate('/game'), 1000);
+      if (getCurrentSetting() === 'little-martian') {
+        navigate('/little-martian');
+      }
+      else {
+        setTimeout(() => navigate('/game'), 1000);
+      }
     } catch (err) {
       console.error("Error generating story name:", err);
       setError("Failed to generate story name.");
@@ -142,7 +147,7 @@ Generate a short, catchy story name. The name should be in plain ASCII character
 
   // Update the stored memory with the introduction details.
   const updateMemoryWithStory = (storyName, chosenOption) => {
-    const currentKey = getCurrentStoryName();
+    const currentKey = getCurrentStoryNameID();
     let chatMemory = getGameMemory(currentKey);
     if (!chatMemory) {
       console.error("No memory found for key:", currentKey);
