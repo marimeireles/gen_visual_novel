@@ -5,27 +5,24 @@ import { getCurrentStoryNameID, getCurrentStory, getCurrentUserName } from '../u
 import { useNavigate } from 'react-router-dom';
 import boxImage from '../assets/box.png';
 import textboxImage from '../assets/box.png';
-// import characterImage from '../assets/default-character.png';
 
-const apiKey = process.env.REACT_APP_API_KEY;
+const key_eden = process.env.EDEN_API_KEY;
+const key_openai = process.env.REACT_APP_API_KEY;
 
 const openai = new OpenAI({ 
-  apiKey: apiKey, 
+  apiKey: key_openai, 
   dangerouslyAllowBrowser: true 
 });
 
 /**
  * Save a memory record in localStorage.
- * The records are stored in an object keyed by game name.
- * Each record contains a timestamp, Assistence's text, the user's name, and the option chosen.
  */
-function saveMemoryRecord(assistentText, userChoice, userName) {
+function saveMemoryRecord(assistentText, userChoice, userName, characterName) {
   const currentStoryName = localStorage.getItem('currentStoryName');
   if (!currentStoryName) {
     console.error("No current story found. Please start a new game first.");
     return;
   }
-
   const memory = JSON.parse(localStorage.getItem(currentStoryName));
   if (!memory) {
     console.error("No memory data found for the current story.");
@@ -33,28 +30,21 @@ function saveMemoryRecord(assistentText, userChoice, userName) {
   }
   
   const timestamp = new Date().toLocaleString();
-  const record = {
-    timestamp,
-    assistentText,
-    userChoice,
-    userName,
-  };
-
+  const record = { timestamp, userChoice, userName };
+  if (characterName) {
+    record[`assistent_${characterName}`] = assistentText;
+  } else {
+    record.assistentText = assistentText;
+  }
   if (!Array.isArray(memory.chatHistory)) {
     memory.chatHistory = [];
   }
   memory.chatHistory.push(record);
-
   localStorage.setItem(currentStoryName, JSON.stringify(memory));
 }
 
 /**
- * Parse the API response text into Assistence's text and the three options.
- * Expected format:
- *   Assistence: <Assistence's text>
- *   option 1: <option 1 text>
- *   option 2: <option 2 text>
- *   option 3: <option 3 text>
+ * Parse the API response text into assistant's text and the three options.
  */
 const parseApiResponse = (responseText) => {
   const lines = responseText.split('\n').filter(line => line.trim() !== '');
@@ -76,16 +66,120 @@ const parseApiResponse = (responseText) => {
   return { assistentText, option1, option2, option3 };
 };
 
+/**
+ * Extracts a character name from the beginning of the text if present.
+ * For example, if the text starts with "Narrator: ..." it returns { characterName: "Narrator", cleanedText: "..." }.
+ */
+const extractCharacterName = (text) => {
+  const colonIndex = text.indexOf(':');
+  if (colonIndex !== -1) {
+    const potentialName = text.substring(0, colonIndex).trim();
+    if (potentialName.length > 0) {
+      const cleanedText = text.substring(colonIndex + 1).trim();
+      return { characterName: potentialName, cleanedText };
+    }
+  }
+  return { characterName: null, cleanedText: text };
+};
+
+/**
+ * Calls the image generation API with a prompt and returns an image URL.
+ * Adapted to use a simple fetch() call instead of the eden-sdk.
+ */
+const fetchGeneratedImage = async (prompt) => {
+  try {
+    // Step 1: Create the image generation task
+    const createResponse = await fetch('https://api.eden.art/v2/tasks/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': '4de5af1e9409b0e000d2445643f171427c41013ac32ca7f4', // Make sure key_eden is correctly set (consider using process.env.REACT_APP_EDEN_API_KEY)
+      },
+      body: JSON.stringify({
+        tool: 'flux_dev_lora',
+        args: {
+          prompt: 'generate a flower field',
+          aspect_ratio: "1:1",
+          prompt_strength: 0.8,
+          output_format: "png",
+          output_quality: 95,
+          disable_safety_checker: true,
+          go_fast: false,
+          seed: 274941510,
+          num_inference_steps: 30,
+          guidance: 2.5,
+          lora_strength: 0.85,
+          n_samples: 1
+        }
+      })
+    });
+    
+    if (!createResponse.ok) {
+      console.error("Error creating task:", createResponse.statusText);
+      return null;
+    }
+    
+    const createData = await createResponse.json();
+    const taskId = createData.task._id;
+    console.log('Task created with id:', taskId);
+    
+    // Step 2: Poll for the task completion (up to ~30 seconds)
+    let attempts = 0;
+    let result = null;
+    while (attempts < 15) { // 15 attempts * 2 seconds = 30 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2 seconds between attempts
+      
+      const statusResponse = await fetch(`https://api.eden.art/v2/tasks/${taskId}`, {
+        headers: {
+          'X-Api-Key': '4de5af1e9409b0e000d2445643f171427c41013ac32ca7f4',
+        }
+      });
+      
+      if (!statusResponse.ok) {
+        console.error("Error fetching task status:", statusResponse.statusText);
+        break;
+      }
+      
+      const statusData = await statusResponse.json();
+      console.log('Task status:', statusData.task.status);
+      
+      // Check if the task is completed and a result exists
+      if (statusData.task.status === "completed" && statusData.task.result) {
+        result = statusData.task.result;
+        break;
+      }
+      
+      attempts++;
+    }
+    
+    if (!result) {
+      console.error("Task did not complete in time or returned no result.");
+      return null;
+    }
+    
+    // Parse the result to extract the image URL.
+    // According to your sample, the result is an array containing an object with an "output" array.
+    const imageUrl = result[0]?.output[0]?.url || null;
+    console.log('Generated image URL:', imageUrl);
+    return imageUrl;
+  } catch (error) {
+    console.error("Image generation error:", error);
+    return null;
+  }
+};
+
 const GameInterface = () => {
   const [currentStoryName, setCurrentStoryNameState] = useState('');
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [lastGeneratedCharacter, setLastGeneratedCharacter] = useState(null);
   const navigate = useNavigate();
   const didFetch = useRef(false);
 
   useEffect(() => {
     const key = getCurrentStoryNameID();
     if (!key) {
-      console.log('Key for game access does not exist. You might have erased your cache or this is a bigger problem, sorry!');
-      // TODO: Optionally redirect or handle this case.
+      console.log('Key for game access does not exist.');
+      // Optionally redirect or handle this case.
     }
     console.log('DEBUG: Current key of GameInterface:', key);
     setCurrentStoryNameState(key);
@@ -93,25 +187,26 @@ const GameInterface = () => {
 
   const userName = getCurrentUserName();
   const storySummary = getCurrentStory();
-  const objective = 'make the player have fun'
-  const charTrait = ['fun', 'sexy', 'wild']
-  const context = ''
+  const objective = 'make the player have fun';
+  const charTrait = ['fun', 'sexy', 'wild'];
+  const context = '';
 
   const [conversationHistory, setConversationHistory] = useState([{
     role: 'user',
     content: `this is the summary of the story ${storySummary}
-    this is what happened up until now ${context}
-    you're both the narrator and different characters, think of an RPG and you're the dm
-    currently you're an alien and your objective is ${objective}
-    you can either say smth as the narrator or as the current character. please add this into the <assistent's text> tag
-    dont talk about yourself in the 3rd person
-    make sure to always say something as an assistent. always talk about yourself in the first person and the player in the 2nd person
-    you also give the player three different options, each one of them corresponding to one of the player's character traits ${charTrait}
-    make sure your replies obey the following format:
-    assistent: <assistent's text>
-    option 1: <option 1 text>
-    option 2: <option 2 text>
-    option 3: <option 3 text>`
+this is what happened up until now ${context}
+you're both the narrator and different characters, think of an RPG and you're the dm.
+currently you're an alien and your objective is ${objective}.
+you can either say something as the narrator or as the current character.
+please add this into the <assistent's text> tag.
+dont talk about yourself in the 3rd person.
+make sure to always say something as an assistent, and always start the assistent's text with who's currently talking (e.g., Narrator or the character's name).
+you also give the player three different options, each corresponding to one of the player's character traits ${charTrait}.
+make sure your replies obey the following format:
+assistent: <assistent's text>
+option 1: <option 1 text>
+option 2: <option 2 text>
+option 3: <option 3 text>`
   }]);
   const [characterPages, setCharacterPages] = useState([]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -119,6 +214,7 @@ const GameInterface = () => {
   const [showOptions, setShowOptions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lastassistentText, setLastassistentText] = useState("");
+  const [characterName, setCharacterName] = useState(null);
 
   const paginateText = (text, pageSize = 200) => {
     const pages = [];
@@ -143,11 +239,27 @@ const GameInterface = () => {
       const responseContent = completion.choices[0].message.content;
       const parsed = parseApiResponse(responseContent);
 
-      setLastassistentText(parsed.assistentText);
+      // Extract character name and clean the assistant text.
+      const { characterName: extractedName, cleanedText } = extractCharacterName(parsed.assistentText);
+      setCharacterName(extractedName);
+      setLastassistentText(cleanedText);
+
+      // Check if we need to trigger a new image generation.
+      if (extractedName && extractedName !== lastGeneratedCharacter) {
+        // Build a prompt for image generation that combines the character and the context.
+        const imagePrompt = `A detailed illustration of ${extractedName} in a scene that reflects the story: ${storySummary}`;
+        const imageUrl = await fetchGeneratedImage(imagePrompt);
+        if (imageUrl) {
+          setGeneratedImage(imageUrl);
+          setLastGeneratedCharacter(extractedName);
+        }
+      }
+
       const responseMessage = { role: 'assistant', content: responseContent };
       setConversationHistory([...messages, responseMessage]);
 
-      const pages = paginateText(parsed.assistentText, 200);
+      // Use the cleaned text for pagination.
+      const pages = paginateText(cleanedText, 200);
       setCharacterPages(pages);
       setCurrentPageIndex(0);
       setOptions([parsed.option1, parsed.option2, parsed.option3]);
@@ -161,7 +273,6 @@ const GameInterface = () => {
   useEffect(() => {
     if (!didFetch.current) {
       fetchGameData();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       didFetch.current = true;
     }
   }, []);
@@ -175,12 +286,14 @@ const GameInterface = () => {
   };
 
   const handleOptionClick = (optionText) => {
-    saveMemoryRecord(lastassistentText, optionText, userName);
-    fetchGameData(optionText); // This sends the selected option as the next user message.
+    saveMemoryRecord(lastassistentText, optionText, userName, characterName);
+    fetchGameData(optionText);
   };
 
   return (
     <GameInterfaceContainer>
+      {/* If there's a generated image, display it as a background overlay */}
+      {generatedImage && <BackgroundImage src={generatedImage} alt="Generated Scene" />}
       <TextBoxBackground />
       <ContentContainer>
         {loading ? (
@@ -206,9 +319,7 @@ const GameInterface = () => {
 
 export default GameInterface;
 
-/* Styled Components for aesthetic adjustments only.
-   Layout dimensions and positions remain the same as before.
-*/
+/* Styled Components for aesthetic adjustments only. */
 
 const GameInterfaceContainer = styled.div`
   position: relative;
@@ -216,6 +327,17 @@ const GameInterfaceContainer = styled.div`
   height: 100vh;
   background: #000;
   overflow: hidden;
+`;
+
+const BackgroundImage = styled.img`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.5;
 `;
 
 const shimmer = keyframes`
@@ -236,7 +358,6 @@ const TextBoxBackground = styled.div`
   filter: drop-shadow(0 0 0.1rem rgb(122, 122, 122));
   z-index: 0;
   
-  /* Pseudo-element for shimmering effect */
   &::after {
     content: "";
     position: absolute;
@@ -251,9 +372,7 @@ const TextBoxBackground = styled.div`
       rgba(255, 255, 255, 0) 100%
     );
     background-size: 200% 100%;
-    animation: ${shimmer} 15s infinite;
-    
-    /* Apply the PNG as a mask so the shimmer only appears on opaque parts */
+    animation: ${shimmer} 10s infinite;
     mask-image: url(${textboxImage});
     mask-size: 100% 100%;
     mask-repeat: no-repeat;
@@ -279,12 +398,11 @@ const ContentContainer = styled.div`
   justify-content: center;
 `;
 
-// Increased font-size for larger text display
 const DialogueText = styled.p`
   margin: 0;
   padding: 0 10px;
   font-size: 24px;
-  color: rgb(222, 222, 222); /* Updated text color */
+  color: rgb(222, 222, 222);
 `;
 
 const MetalButton = styled.button`
@@ -293,7 +411,7 @@ const MetalButton = styled.button`
   font-family: 'Cinzel', serif;
   font-weight: bold;
   letter-spacing: 1px;
-  color: rgb(222, 222, 222); /* Updated text color */
+  color: rgb(222, 222, 222);
   text-align: center;
   white-space: normal;
   overflow-wrap: break-word;
@@ -369,7 +487,6 @@ const SpecialMetalButton = styled.button`
   }
 `;
 
-// Next button uses the metal style while preserving its absolute position.
 const NextButton = styled(MetalButton)`
   position: absolute;
   left: 85%;
@@ -377,11 +494,9 @@ const NextButton = styled(MetalButton)`
   z-index: 2;
 `;
 
-// Container for option buttons when options are shown.
 const OptionsContainer = styled.div`
   display: flex;
   gap: 15px;
 `;
 
-// Option buttons using the same metal style.
 const OptionButton = styled(SpecialMetalButton)``;
