@@ -52,7 +52,7 @@ const MainMenu = () => {
   };
 
   const handleAbout = () => {
-    console.log('Displays about page');
+    navigate('/about');
   };
 
   const cloudCount = 8;

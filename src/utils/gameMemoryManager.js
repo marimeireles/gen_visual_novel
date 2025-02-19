@@ -44,3 +44,11 @@ export const getCurrentSetting = () => {
   const memory = getGameMemory(currentStoryKey);
   return memory?.setup?.genreSetting?.setting || null;
 };
+
+export const getPersonalityTraits = () => {
+  const currentStoryKey = getCurrentStoryNameID();
+  if (!currentStoryKey) return null;
+  const memory = getGameMemory(currentStoryKey);
+  return memory?.setup?.personalityTraits || null;
+};
+

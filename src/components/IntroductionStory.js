@@ -121,7 +121,7 @@ Generate a short, catchy story name. The name should be in plain ASCII character
       setPhase('done');
       // Redirect to game interface shortly after.
       if (getCurrentSetting() === 'little-martian') {
-        navigate('/little-martian');
+        navigate('/game'); // TODO: each kind of game was supposed to have it's own page
       }
       else {
         setTimeout(() => navigate('/game'), 1000);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import OpenAI from 'openai';
-import { getCurrentStoryNameID, getCurrentStory, getCurrentUserName } from '../utils/gameMemoryManager';
+import { getCurrentStoryNameID, getCurrentStory, getCurrentUserName, getPersonalityTraits } from '../utils/gameMemoryManager';
 import { useNavigate } from 'react-router-dom';
 import boxImage from '../assets/box.png';
 import textboxImage from '../assets/box.png';
@@ -9,9 +9,9 @@ import textboxImage from '../assets/box.png';
 const key_eden = process.env.EDEN_API_KEY;
 const key_openai = process.env.REACT_APP_API_KEY;
 
-const openai = new OpenAI({ 
-  apiKey: key_openai, 
-  dangerouslyAllowBrowser: true 
+const openai = new OpenAI({
+  apiKey: key_openai,
+  dangerouslyAllowBrowser: true
 });
 
 /**
@@ -28,7 +28,7 @@ function saveMemoryRecord(assistentText, userChoice, userName, characterName) {
     console.error("No memory data found for the current story.");
     return;
   }
-  
+
   const timestamp = new Date().toLocaleString();
   const record = { timestamp, userChoice, userName };
   if (characterName) {
@@ -40,6 +40,31 @@ function saveMemoryRecord(assistentText, userChoice, userName, characterName) {
     memory.chatHistory = [];
   }
   memory.chatHistory.push(record);
+
+  // Build a summary of the conversation (assistant texts and chosen options)
+  let summary = '';
+  memory.chatHistory.forEach(rec => {
+    // Append the user option
+    if (rec.userChoice) {
+      summary += `Option: ${rec.userChoice}\n`;
+    }
+    // Append the assistant's text. It might be stored under a generic key or under a character-specific key.
+    if (rec.assistentText) {
+      summary += `Assistant: ${rec.assistentText}\n`;
+    } else {
+      Object.keys(rec).forEach(key => {
+        if (key.startsWith("assistent_")) {
+          // Remove the "assistent_" prefix for clarity
+          const charName = key.replace("assistent_", "");
+          summary += `Assistant (${charName}): ${rec[key]}\n`;
+        }
+      });
+    }
+  });
+
+  // Add the summary as a top-level entry in the memory object
+  memory.summary = summary;
+
   localStorage.setItem(currentStoryName, JSON.stringify(memory));
 }
 
@@ -84,7 +109,6 @@ const extractCharacterName = (text) => {
 
 /**
  * Calls the image generation API with a prompt and returns an image URL.
- * Adapted to use a simple fetch() call instead of the eden-sdk.
  */
 const fetchGeneratedImage = async (prompt) => {
   try {
@@ -93,12 +117,13 @@ const fetchGeneratedImage = async (prompt) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': '4de5af1e9409b0e000d2445643f171427c41013ac32ca7f4', // Make sure key_eden is correctly set (consider using process.env.REACT_APP_EDEN_API_KEY)
+        'X-Api-Key': '4de5af1e9409b0e000d2445643f171427c41013ac32ca7f4',
       },
       body: JSON.stringify({
         tool: 'flux_dev_lora',
         args: {
-          prompt: 'generate a flower field',
+          lora: '677f7f35021f37c66c49a20b',
+          prompt: prompt,
           aspect_ratio: "1:1",
           prompt_strength: 0.8,
           output_format: "png",
@@ -108,57 +133,56 @@ const fetchGeneratedImage = async (prompt) => {
           seed: 274941510,
           num_inference_steps: 30,
           guidance: 2.5,
-          lora_strength: 0.85,
+          lora_strength: 1,
           n_samples: 1
         }
       })
     });
-    
+
     if (!createResponse.ok) {
       console.error("Error creating task:", createResponse.statusText);
       return null;
     }
-    
+
     const createData = await createResponse.json();
     const taskId = createData.task._id;
     console.log('Task created with id:', taskId);
-    
-    // Step 2: Poll for the task completion (up to ~30 seconds)
+
+    // Poll for the task completion
     let attempts = 0;
     let result = null;
-    while (attempts < 15) { // 15 attempts * 2 seconds = 30 seconds
+    while (attempts < 25) { // 15 attempts * 2 seconds = 30 seconds
       await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2 seconds between attempts
-      
+
       const statusResponse = await fetch(`https://api.eden.art/v2/tasks/${taskId}`, {
         headers: {
           'X-Api-Key': '4de5af1e9409b0e000d2445643f171427c41013ac32ca7f4',
         }
       });
-      
+
       if (!statusResponse.ok) {
         console.error("Error fetching task status:", statusResponse.statusText);
         break;
       }
-      
+
       const statusData = await statusResponse.json();
       console.log('Task status:', statusData.task.status);
-      
+
       // Check if the task is completed and a result exists
       if (statusData.task.status === "completed" && statusData.task.result) {
         result = statusData.task.result;
         break;
       }
-      
+
       attempts++;
     }
-    
+
     if (!result) {
       console.error("Task did not complete in time or returned no result.");
       return null;
     }
-    
+
     // Parse the result to extract the image URL.
-    // According to your sample, the result is an array containing an object with an "output" array.
     const imageUrl = result[0]?.output[0]?.url || null;
     console.log('Generated image URL:', imageUrl);
     return imageUrl;
@@ -168,10 +192,55 @@ const fetchGeneratedImage = async (prompt) => {
   }
 };
 
+/**
+ * Summarizes the conversation history by filtering out the initial prompt.
+ * Only includes exchanges between the assistant and the user.
+ */
+const summarizeBackstory = async (conversation) => {
+  // Filter out the initial long prompt message if present.
+  const gameMessages = conversation.filter((msg, index) => {
+    // Assume the first message (system or user) is the setup prompt if it contains "this is the summary"
+    if (
+      index === 0 &&
+      msg.role === 'user' &&
+      msg.content.toLowerCase().includes('this is the summary of the story')
+    ) {
+      return false;
+    }
+    return msg.role === 'user' || msg.role === 'assistant';
+  });
+
+  const promptForSummary =
+    `Summarize the following game conversation, focusing on the assistant's responses and the user's choices, and ignoring the initial prompt:\n\n` +
+    gameMessages
+      .map(
+        (msg) =>
+          `${msg.role === 'assistant' ? 'Assistant' : 'User'}: ${msg.content}`
+      )
+      .join('\n');
+
+  try {
+    const summaryResponse = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: 'system', content: 'You are an assistant that summarizes game conversations.' },
+        { role: 'user', content: promptForSummary }
+      ],
+    });
+    const summary = summaryResponse.choices[0].message.content.trim();
+    return summary;
+  } catch (error) {
+    console.error('Error summarizing conversation:', error);
+    return "";
+  }
+};
+
 const GameInterface = () => {
   const [currentStoryName, setCurrentStoryNameState] = useState('');
   const [generatedImage, setGeneratedImage] = useState(null);
   const [lastGeneratedCharacter, setLastGeneratedCharacter] = useState(null);
+  // Keep track of the last used background prompt
+  const [lastBackgroundPrompt, setLastBackgroundPrompt] = useState('');
   const navigate = useNavigate();
   const didFetch = useRef(false);
 
@@ -188,9 +257,10 @@ const GameInterface = () => {
   const userName = getCurrentUserName();
   const storySummary = getCurrentStory();
   const objective = 'make the player have fun';
-  const charTrait = ['fun', 'sexy', 'wild'];
+  const charTrait = getPersonalityTraits();
   const context = '';
 
+  // Initialize conversationHistory with the initial long prompt.
   const [conversationHistory, setConversationHistory] = useState([{
     role: 'user',
     content: `this is the summary of the story ${storySummary}
@@ -202,6 +272,7 @@ please add this into the <assistent's text> tag.
 dont talk about yourself in the 3rd person.
 make sure to always say something as an assistent, and always start the assistent's text with who's currently talking (e.g., Narrator or the character's name).
 you also give the player three different options, each corresponding to one of the player's character traits ${charTrait}.
+it's very important you always say something your role as a narrator/game master is the most important
 make sure your replies obey the following format:
 assistent: <assistent's text>
 option 1: <option 1 text>
@@ -224,8 +295,38 @@ option 3: <option 3 text>`
     return pages;
   };
 
+  // Helper function to decide if we should change the background image
+  const decideIfBackgroundShouldChange = async (previousPrompt, newPrompt) => {
+    try {
+      const decisionMessages = [
+        {
+          role: 'system',
+          content: 'You are an assistant that determines if the background image should be updated based on changes in character or scene description. Answer only with "yes" or "no".'
+        },
+        {
+          role: 'user',
+          content: `The previous background prompt was: ${previousPrompt || "none"}. The new background prompt is: ${newPrompt}. Should we update the background image?`
+        }
+      ];
+      const decisionResponse = await openai.chat.completions.create({
+         model: "gpt-4o-mini",
+         messages: decisionMessages,
+      });
+      const decisionText = decisionResponse.choices[0].message.content.trim().toLowerCase();
+      console.log("Decision from OpenAI:", decisionText);
+      if (decisionText.includes("yes")) {
+         return "yes";
+      }
+      return "no";
+    } catch (error) {
+       console.error("Error deciding background change:", error);
+       return "no";
+    }
+  };
+
   const fetchGameData = async (newMessage = null) => {
     setLoading(true);
+    // If a new user message exists, append it; otherwise use the current conversation history.
     const messages = newMessage
       ? [...conversationHistory, { role: 'user', content: newMessage }]
       : conversationHistory;
@@ -244,21 +345,43 @@ option 3: <option 3 text>`
       setCharacterName(extractedName);
       setLastassistentText(cleanedText);
 
-      // Check if we need to trigger a new image generation.
-      if (extractedName && extractedName !== lastGeneratedCharacter) {
-        // Build a prompt for image generation that combines the character and the context.
-        const imagePrompt = `A detailed illustration of ${extractedName} in a scene that reflects the story: ${storySummary}`;
-        const imageUrl = await fetchGeneratedImage(imagePrompt);
-        if (imageUrl) {
-          setGeneratedImage(imageUrl);
-          setLastGeneratedCharacter(extractedName);
+      let conversationSnippet = "";
+      if (newMessage) {
+        conversationSnippet = `User: ${newMessage} Assistant: ${cleanedText}`;
+      } else if (conversationHistory.length > 0) {
+        // If the conversation has already been summarized, use that summary.
+        conversationSnippet = conversationHistory[0].role === 'system'
+          ? conversationHistory[0].content
+          : storySummary;
+      } else {
+        conversationSnippet = storySummary;
+      }
+      const userName = getCurrentUserName();
+      const currentStoryName = localStorage.getItem('currentStoryName');
+      const memoryData = currentStoryName ? JSON.parse(localStorage.getItem(currentStoryName)) : {};
+      const memorySummary = memoryData.summary || "";
+      console.log('memorySummary: ', memorySummary)
+      const newImagePrompt = `A detailed illustration representing this scenario ${conversationSnippet}, remember the ${userName} shouldn’t be represented in the story nor the narrator, only other characters should be represented. This is what happened last: ${memorySummary}`;
+
+      // Only check for a new background image if the character has changed or the prompt is different.
+      if (extractedName !== lastGeneratedCharacter || newImagePrompt !== lastBackgroundPrompt) {
+        const decision = await decideIfBackgroundShouldChange(lastBackgroundPrompt, newImagePrompt);
+        if (decision === 'yes') {
+          const imageUrl = await fetchGeneratedImage(newImagePrompt);
+          if (imageUrl) {
+            setGeneratedImage(imageUrl);
+            setLastBackgroundPrompt(newImagePrompt);
+            setLastGeneratedCharacter(extractedName);
+          }
         }
       }
 
+      // Append the assistant's response to the conversation.
       const responseMessage = { role: 'assistant', content: responseContent };
-      setConversationHistory([...messages, responseMessage]);
+      const updatedHistory = [...messages, responseMessage];
+      setConversationHistory(updatedHistory);
 
-      // Use the cleaned text for pagination.
+      // Paginate the cleaned assistant text.
       const pages = paginateText(cleanedText, 200);
       setCharacterPages(pages);
       setCurrentPageIndex(0);
@@ -318,6 +441,7 @@ option 3: <option 3 text>`
 };
 
 export default GameInterface;
+
 
 /* Styled Components for aesthetic adjustments only. */
 
