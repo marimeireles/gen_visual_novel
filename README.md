@@ -5,6 +5,29 @@ In order to export your API KEY:
 REACT_APP_API_KEY='api_key'
 ```
 
+Some little useful notes code scraps:
+
+```js
+const key1 = localStorage.getItem('currentStoryName');
+const memory1 = JSON.parse(localStorage.getItem(key1));
+console.log(memory1);
+
+const key2 = localStorage.getItem('currentStoryName');
+const memory2 = JSON.parse(localStorage.getItem(key2));
+console.log(memory2);
+
+const key3 = localStorage.getItem('currentStoryName');
+const memory3 = JSON.parse(localStorage.getItem(key3));
+console.log(memory3);
+
+//long prompts make things more interesting
+//image magick possibly, for marzipan's things
+
+//will clear everything
+localStorage.clear();
+```
+
+
 **I think one might have to run npm install before npm start?**
 
 `npm start`
